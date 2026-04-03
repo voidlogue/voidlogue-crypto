@@ -1,33 +1,19 @@
-name: Publish to npm with Provenance
-
-on:
-  push:
-    tags:
-      - 'v*' # Triggers when you push a tag like v1.0.0
-
-jobs:
-  build-and-publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write   # To create the GitHub Release
-      id-token: write   # Required for npm provenance (OIDC)
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js
+      - name: Setup Node.js (Standard)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://npmjs.org'
+          # Remove registry-url here to allow standard public installs
 
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Run Tests
-        run: npm test
+      - name: Install & Test
+        run: |
+          npm install
+          npm test
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -37,7 +23,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to npm
-        # The --provenance flag links the package to this specific GitHub Action run
-        run: npm publish --provenance --access public
+        run: |
+          # Configure registry specifically for this step
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
+          npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
