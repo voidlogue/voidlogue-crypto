@@ -1,0 +1,57 @@
+MIT License
+
+Copyright (c) 2026 Voidlogue
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## License rationale
+
+This package is published under the MIT license for the following reasons:
+
+1. **Auditability over restriction.** The purpose of open-sourcing this package
+   is to allow independent verification of Voidlogue's privacy claims. A
+   permissive license removes barriers to inspection and review.
+
+2. **Cryptographic primitives benefit from wide scrutiny.** Security research
+   is best served by making cryptographic code as accessible as possible.
+   Restrictive licenses discourage security researchers.
+
+3. **The word list is already public.** The EFF long wordlist included in this
+   package is published by the Electronic Frontier Foundation under an open
+   license. There is no proprietary component to protect here.
+
+4. **This package alone cannot replicate Voidlogue.** The client-side crypto
+   layer requires a server (Phoenix/Elixir backend, PostgreSQL, Oban jobs,
+   push infrastructure) which is not included here. Permissive licensing of
+   this package does not expose the platform's competitive differentiators.
+
+## What the MIT license means for you
+
+- You can read, inspect, fork, and use this code for any purpose
+- You can use it in commercial products
+- You must include the copyright notice in any copy or substantial portion
+- There is no warranty — use at your own risk
+
+## What this license does NOT cover
+
+The Voidlogue platform server code, the Revelation product, the admin
+infrastructure, and the marketing pages are proprietary and are NOT covered
+by this license. This license applies only to the files in this repository.

@@ -1,0 +1,52 @@
+{
+  "name": "voidlogue-crypto",
+  "version": "1.0.0",
+  "description": "Open-source client-side cryptographic primitives for Voidlogue — published for independent audit and verification of privacy claims.",
+  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./voidshield": "./src/voidshield.js",
+    "./vault": "./src/vault.js",
+    "./eff_wordlist": "./src/eff_wordlist.js"
+  },
+  "files": [
+    "src/",
+    "index.js",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "encryption",
+    "privacy",
+    "ephemeral",
+    "messaging",
+    "aes-gcm",
+    "pbkdf2",
+    "web-crypto",
+    "voidlogue",
+    "e2e",
+    "zero-knowledge"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/voidlogue/voidlogue-crypto.git"
+  },
+  "homepage": "https://voidlogue.com",
+  "bugs": {
+    "url": "https://github.com/voidlogue/voidlogue-crypto/issues",
+    "email": "security@voidlogue.com"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}
