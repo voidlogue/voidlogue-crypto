@@ -1,14 +1,26 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers when you push a tag like v1.0.2
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # To create GitHub Releases
+      id-token: write   # To enable npm Provenance
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js (Standard)
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          # Remove registry-url here to allow standard public installs
 
       - name: Install & Test
         run: |
@@ -24,8 +36,7 @@
 
       - name: Publish to npm
         run: |
-          # Configure registry specifically for this step
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc
-          npm publish --provenance
+          npm config set //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
+          npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
