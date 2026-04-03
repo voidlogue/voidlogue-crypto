@@ -1,6 +1,6 @@
 {
   "name": "voidlogue-crypto",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "description": "Open-source client-side cryptographic primitives for Voidlogue — published for independent audit and verification of privacy claims.",
   "main": "index.js",
   "type": "module",
@@ -32,11 +32,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/voidlogue/voidlogue-crypto.git"
+    "url": "https://github.com"
   },
   "homepage": "https://voidlogue.com",
   "bugs": {
-    "url": "https://github.com/voidlogue/voidlogue-crypto/issues",
+    "url": "https://github.com",
     "email": "security@voidlogue.com"
   },
   "engines": {
@@ -48,5 +48,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
