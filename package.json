@@ -32,11 +32,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wycliffogembo87/voidlogue-crypto.git"
+    "url": "https://github.com/voidlogue/voidlogue-crypto.git"
   },
   "homepage": "https://voidlogue.com",
   "bugs": {
-    "url": "https://github.com/wycliffogembo87/voidlogue-crypto/issues",
+    "url": "https://github.com/voidlogue/voidlogue-crypto/issues",
     "email": "security@voidlogue.com"
   },
   "engines": {
