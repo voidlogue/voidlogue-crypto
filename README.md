@@ -141,16 +141,16 @@ Room hash:
   roomHash = SHA-256(sort([hA,hB]).join(":") + ":" + codename + ":" + APP_SALT)
 
 Conversation key:
-  key = PBKDF2(codename, salt=roomHash, iters=100_000, hash=SHA-256) → AES-256-GCM
+  key = PBKDF2(codename, salt=roomHash, iters=600_000, hash=SHA-256) → AES-256-GCM
 
 Revelation key:
   hS, hR = SHA-256(email.toLowerCase().trim())
   fh[]   = SHA-256(normalise(fieldValue))
   input  = sort([hS,hR]).join(":") + ":" + fh.join(":")
-  key    = PBKDF2(input, salt="voidlogue-revelation-v1", iters=100_000) → AES-256-GCM
+  key    = PBKDF2(input, salt="voidlogue-revelation-v2", iters=600_000, hash=SHA-256) → AES-256-GCM
 
 Vault PIN key:
-  key = PBKDF2(PIN, random_16B_salt, iters=100_000, hash=SHA-256) → AES-256-GCM
+  key = PBKDF2(PIN, random_16B_salt, iters=2_000_000, hash=SHA-256) → AES-256-GCM
 
 All encryption: AES-256-GCM with random 96-bit IV per operation
 All randomness: crypto.getRandomValues() with rejection sampling

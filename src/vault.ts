@@ -1,5 +1,5 @@
 /**
- * vault.js — Voidlogue Conversation Vault
+ * vault.ts — Voidlogue Conversation Vault
  *
  * PIN-based local encryption for saved conversations.
  * The PIN never leaves the device. Email + codename are
@@ -15,25 +15,42 @@
 
 const ENC = new TextEncoder();
 const DEC = new TextDecoder();
-const PBKDF2_ITER = 600_000;
+const PBKDF2_ITER = 2_000_000;
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
-const LABEL_PBKDF2_ITER = 600_000;
+const LOCKOUT_MS = 15 * 60 * 1000;
 
-function randomB64(bytes) {
+type LabelEntry = {
+  encrypted: string;
+  iv: string;
+  salt?: string;
+  hint?: string;
+};
+type ConvListEntry = { roomHash: string; hint: LabelEntry; savedAt: number };
+type VaultBlob = {
+  salt: string;
+  iv: string;
+  data: string;
+  attempts: number;
+  lockedUntil: number | null;
+  codenameSalt?: string;
+  codenameIv?: string;
+  codenameData?: string;
+};
+
+function randomB64(bytes: number): string {
   const array = crypto.getRandomValues(new Uint8Array(bytes));
   let binary = '';
   for (let i = 0; i < array.length; i++) {
-    binary += String.fromCharCode(array[i]);
+    binary += String.fromCharCode(array[i]!);
   }
   return btoa(binary);
 }
 
-async function deriveKey(pin, saltB64) {
+async function deriveKey(pin: string, saltB64: string): Promise<CryptoKey> {
   const salt = Uint8Array.from(atob(saltB64), (c) => c.charCodeAt(0));
   const km = await crypto.subtle.importKey(
     'raw',
-    ENC.encode(String(pin)),
+    ENC.encode(pin),
     'PBKDF2',
     false,
     ['deriveKey']
@@ -47,7 +64,10 @@ async function deriveKey(pin, saltB64) {
   );
 }
 
-async function deriveLabelKey(passphrase, saltB64) {
+async function deriveLabelKey(
+  passphrase: string,
+  saltB64: string
+): Promise<CryptoKey> {
   const salt = Uint8Array.from(atob(saltB64), (c) => c.charCodeAt(0));
   const km = await crypto.subtle.importKey(
     'raw',
@@ -57,7 +77,7 @@ async function deriveLabelKey(passphrase, saltB64) {
     ['deriveKey']
   );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: LABEL_PBKDF2_ITER, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt, iterations: PBKDF2_ITER, hash: 'SHA-256' },
     km,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -65,9 +85,13 @@ async function deriveLabelKey(passphrase, saltB64) {
   );
 }
 
-async function encryptLabel(label, keyOrPassphrase) {
-  if (!label) return { encrypted: '', hint: '(no label)' };
-  let key, salt;
+async function encryptLabel(
+  label: string,
+  keyOrPassphrase: CryptoKey | string
+): Promise<LabelEntry> {
+  if (!label) return { encrypted: '', iv: '', hint: '(no label)' };
+  let key: CryptoKey;
+  let salt: string | undefined;
   if (typeof keyOrPassphrase === 'string') {
     salt = randomB64(16);
     key = await deriveLabelKey(keyOrPassphrase, salt);
@@ -85,9 +109,12 @@ async function encryptLabel(label, keyOrPassphrase) {
   return salt ? { encrypted: data, iv, salt } : { encrypted: data, iv };
 }
 
-async function decryptLabel(entry, keyOrPassphrase) {
+async function decryptLabel(
+  entry: LabelEntry,
+  keyOrPassphrase: CryptoKey | string
+): Promise<string> {
   if (!entry || !entry.encrypted) return '';
-  let key;
+  let key: CryptoKey;
   if (typeof keyOrPassphrase === 'string') {
     if (!entry.salt) throw new Error('missing_salt');
     key = await deriveLabelKey(keyOrPassphrase, entry.salt);
@@ -107,8 +134,13 @@ export const LabelCipher = {
 };
 
 export const Vault = {
-  /** Save email + codename encrypted with PIN. hint encrypted with PIN-derived key. */
-  async save(roomHash, email, codename, pin, hint = '') {
+  async save(
+    roomHash: string,
+    email: string,
+    codename: string,
+    pin: string,
+    hint: string = ''
+  ): Promise<boolean> {
     const salt = randomB64(16);
     const ivBytes = crypto.getRandomValues(new Uint8Array(12));
     const iv = btoa(String.fromCharCode(...ivBytes));
@@ -118,7 +150,7 @@ export const Vault = {
       key,
       ENC.encode(JSON.stringify({ email, codename }))
     );
-    const blob = {
+    const blob: VaultBlob = {
       salt,
       iv,
       data: btoa(String.fromCharCode(...new Uint8Array(ct))),
@@ -148,11 +180,13 @@ export const Vault = {
     return true;
   },
 
-  /** Verify codename against the codename-encrypted verification blob. Returns {email} or throws. */
-  async verifyCodename(roomHash, codename) {
+  async verifyCodename(
+    roomHash: string,
+    codename: string
+  ): Promise<{ email: string }> {
     const raw = localStorage.getItem(`voidlogue_conv_${roomHash}`);
     if (!raw) throw new Error('not_found');
-    const blob = JSON.parse(raw);
+    const blob = JSON.parse(raw) as VaultBlob;
     if (!blob.codenameSalt || !blob.codenameIv || !blob.codenameData) {
       throw new Error('no_codename_blob');
     }
@@ -164,11 +198,16 @@ export const Vault = {
     return { email };
   },
 
-  /** Decrypt with PIN. Returns {email, codename, hint} or {error, ...}. */
-  async load(roomHash, pin) {
+  async load(
+    roomHash: string,
+    pin: string
+  ): Promise<
+    | { email: string; codename: string; hint: string }
+    | { error: string; minutesRemaining?: number; attemptsLeft?: number }
+  > {
     const raw = localStorage.getItem(`voidlogue_conv_${roomHash}`);
     if (!raw) return { error: 'not_found' };
-    const blob = JSON.parse(raw);
+    const blob = JSON.parse(raw) as VaultBlob;
 
     if (blob.lockedUntil && Date.now() < blob.lockedUntil) {
       const mins = Math.ceil((blob.lockedUntil - Date.now()) / 60000);
@@ -211,8 +250,12 @@ export const Vault = {
     }
   },
 
-  /** Re-encrypt with new PIN after user re-enters email + codename. */
-  async resetPin(roomHash, email, codename, newPin) {
+  async resetPin(
+    roomHash: string,
+    email: string,
+    codename: string,
+    newPin: string
+  ): Promise<boolean> {
     const entry = this._getEncryptedHint(roomHash);
     return this.save(
       roomHash,
@@ -223,21 +266,22 @@ export const Vault = {
     );
   },
 
-  /** Re-encrypt label with a new key. */
-  async updateLabel(roomHash, newHint, keyOrPassphrase) {
+  async updateLabel(
+    roomHash: string,
+    newHint: string,
+    keyOrPassphrase: CryptoKey | string
+  ): Promise<void> {
     const entry = await encryptLabel(newHint, keyOrPassphrase);
     await this._updateIndex(roomHash, entry);
   },
 
-  /** Remove a conversation from vault and index. */
-  delete(roomHash) {
+  delete(roomHash: string): void {
     localStorage.removeItem(`voidlogue_conv_${roomHash}`);
     const list = this.list().filter((c) => c.roomHash !== roomHash);
     localStorage.setItem('voidlogue_convlist', JSON.stringify(list));
   },
 
-  /** Returns the plaintext index of saved conversations. */
-  list() {
+  list(): ConvListEntry[] {
     try {
       return JSON.parse(localStorage.getItem('voidlogue_convlist') || '[]');
     } catch {
@@ -245,29 +289,30 @@ export const Vault = {
     }
   },
 
-  /** Returns true if conversation has a PIN-protected vault entry. */
-  has(roomHash) {
+  has(roomHash: string): boolean {
     const raw = localStorage.getItem(`voidlogue_conv_${roomHash}`);
     if (!raw) return false;
     try {
-      const blob = JSON.parse(raw);
+      const blob = JSON.parse(raw) as VaultBlob;
       return !!blob.salt && !!blob.data;
     } catch {
       return false;
     }
   },
 
-  /** Returns true if conversation has any vault entry. */
-  hasAny(roomHash) {
+  hasAny(roomHash: string): boolean {
     if (this.has(roomHash)) return true;
     return this.list().some((c) => c.roomHash === roomHash);
   },
 
-  /** Returns lockout info without attempting a decrypt. */
-  lockoutStatus(roomHash) {
+  lockoutStatus(roomHash: string): {
+    locked: boolean;
+    minutesRemaining?: number;
+    attemptsUsed?: number;
+  } | null {
     const raw = localStorage.getItem(`voidlogue_conv_${roomHash}`);
     if (!raw) return null;
-    const blob = JSON.parse(raw);
+    const blob = JSON.parse(raw) as VaultBlob;
     if (blob.lockedUntil && Date.now() < blob.lockedUntil) {
       return {
         locked: true,
@@ -277,8 +322,7 @@ export const Vault = {
     return { locked: false, attemptsUsed: blob.attempts || 0 };
   },
 
-  /** Wipe everything — called by panic clear. */
-  wipeAll() {
+  wipeAll(): void {
     const list = this.list();
     list.forEach((c) =>
       localStorage.removeItem(`voidlogue_conv_${c.roomHash}`)
@@ -286,24 +330,23 @@ export const Vault = {
     localStorage.removeItem('voidlogue_convlist');
   },
 
-  _getEncryptedHint(roomHash) {
+  _getEncryptedHint(roomHash: string): LabelEntry | null {
     return this.list().find((c) => c.roomHash === roomHash)?.hint || null;
   },
 
-  async _updateIndex(roomHash, labelEntry) {
+  async _updateIndex(roomHash: string, labelEntry: LabelEntry): Promise<void> {
     const list = this.list().filter((c) => c.roomHash !== roomHash);
     list.unshift({ roomHash, hint: labelEntry, savedAt: Date.now() });
     localStorage.setItem('voidlogue_convlist', JSON.stringify(list));
   },
 
-  /** Migrate any plaintext labels to encrypted format. Call once on app start. */
-  async migratePlaintextLabels() {
+  async migratePlaintextLabels(): Promise<void> {
     if (localStorage.getItem('voidlogue_labels_migrated')) return;
     const list = this.list();
     let changed = false;
     for (const entry of list) {
       if (!entry.hint || typeof entry.hint === 'string') {
-        entry.hint = { encrypted: '', hint: '(no label)' };
+        entry.hint = { encrypted: '', iv: '', hint: '(no label)' };
         changed = true;
       }
     }

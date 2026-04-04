@@ -1,0 +1,166 @@
+import { describe, it } from 'node:test';
+import * as fc from 'fast-check';
+import { VoidShield, generateCodename } from '../src/voidshield.js';
+
+describe('Fuzz: VoidShield.hex', () => {
+  it('always returns 64-char lowercase hex for any string input', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.string(), async (input) => {
+        const h = await VoidShield.hex(input);
+        return h.length === 64 && /^[0-9a-f]+$/.test(h);
+      })
+    );
+  });
+});
+
+describe('Fuzz: VoidShield.roomId', () => {
+  it('always returns 64-char hex regardless of email/codename input', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        async (a, b, c) => {
+          const id = await VoidShield.roomId(a, b, c);
+          return id.length === 64 && /^[0-9a-f]+$/.test(id);
+        }
+      )
+    );
+  });
+
+  it('is commutative for emails', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string(),
+        fc.string(),
+        fc.string(),
+        async (a, b, c) => {
+          const id1 = await VoidShield.roomId(a, b, c);
+          const id2 = await VoidShield.roomId(b, a, c);
+          return id1 === id2;
+        }
+      )
+    );
+  });
+});
+
+describe('Fuzz: encrypt/decrypt round-trip', () => {
+  it('decrypt(encrypt(x)) === x for any plaintext', async () => {
+    const roomHash = await VoidShield.hex('test-room');
+    const key = await VoidShield.deriveKey('test-codename', roomHash);
+    await fc.assert(
+      fc.asyncProperty(fc.string({ minLength: 1 }), async (plaintext) => {
+        const { ciphertextB64, ivB64 } = await VoidShield.encrypt(
+          plaintext,
+          key
+        );
+        const decrypted = await VoidShield.decrypt(ciphertextB64, ivB64, key);
+        return decrypted === plaintext;
+      }),
+      { numRuns: 10 }
+    );
+  });
+});
+
+describe('Fuzz: secureRandom', () => {
+  it('always returns values in [0, max)', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 10000 }), (max) => {
+        const result = VoidShield.secureRandom(max);
+        return result >= 0 && result < max && Number.isInteger(result);
+      })
+    );
+  });
+});
+
+describe('Fuzz: validateCodename', () => {
+  it('rejects strings shorter than 8 chars', () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 7 }), (input) => {
+        const result = VoidShield.validateCodename(input);
+        return !result.valid;
+      })
+    );
+  });
+
+  it('rejects numeric-only strings', () => {
+    fc.assert(
+      fc.property(
+        fc.string({ minLength: 8 }).filter((s) => /^\d+$/.test(s)),
+        (input) => {
+          const result = VoidShield.validateCodename(input);
+          return !result.valid;
+        }
+      )
+    );
+  });
+});
+
+describe('Fuzz: deriveRevelationKey', () => {
+  it('handles arbitrary field value arrays', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string(),
+        fc.string(),
+        fc.array(fc.string()),
+        async (sender, recipient, fields) => {
+          const key = await VoidShield.deriveRevelationKey(
+            sender,
+            recipient,
+            fields
+          );
+          return key.type === 'secret';
+        }
+      ),
+      { numRuns: 2 }
+    );
+  });
+});
+
+describe('Fuzz: ciphertext tamper detection', () => {
+  it('any single-byte modification causes decryption failure', async () => {
+    const roomHash = await VoidShield.hex('tamper-test');
+    const key = await VoidShield.deriveKey('tamper-codename', roomHash);
+
+    await fc.assert(
+      fc.asyncProperty(fc.string({ minLength: 1 }), async (plaintext) => {
+        const { ciphertextB64, ivB64 } = await VoidShield.encrypt(
+          plaintext,
+          key
+        );
+
+        if (ciphertextB64.length === 0) return true;
+
+        const pos = Math.floor(Math.random() * ciphertextB64.length);
+        const tampered =
+          ciphertextB64.slice(0, pos) +
+          String.fromCharCode((ciphertextB64.charCodeAt(pos) + 1) % 256) +
+          ciphertextB64.slice(pos + 1);
+
+        try {
+          await VoidShield.decrypt(tampered, ivB64, key);
+          return false;
+        } catch {
+          return true;
+        }
+      }),
+      { numRuns: 10 }
+    );
+  });
+});
+
+describe('Fuzz: generateCodename', () => {
+  it('always produces valid codenames from EFF wordlist', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 10 }), (wordCount) => {
+        const codename = generateCodename(wordCount);
+        const words = codename.split('-');
+        const expected = Math.max(2, Math.min(8, wordCount));
+        return (
+          words.length === expected &&
+          words.every((w) => w.length > 0 && /^[a-z]+$/.test(w))
+        );
+      })
+    );
+  });
+});

@@ -1,18 +1,18 @@
 {
   "name": "voidlogue-crypto",
-  "version": "1.0.12",
+  "version": "2.0.0",
   "description": "Open-source client-side cryptographic primitives for Voidlogue — published for independent audit and verification of privacy claims.",
   "main": "index.js",
   "type": "module",
   "exports": {
-    ".": "./index.js",
-    "./voidshield": "./src/voidshield.js",
-    "./vault": "./src/vault.js",
-    "./eff_wordlist": "./src/eff_wordlist.js"
+    ".": "./index.ts",
+    "./voidshield": "./src/voidshield.ts",
+    "./vault": "./src/vault.ts",
+    "./eff_wordlist": "./src/eff_wordlist.ts"
   },
   "files": [
     "src/",
-    "index.js",
+    "index.ts",
     "README.md",
     "SECURITY.md",
     "LICENSE"
@@ -24,6 +24,8 @@
     "messaging",
     "aes-gcm",
     "pbkdf2",
+    "post-quantum",
+    "kyber",
     "web-crypto",
     "voidlogue",
     "e2e",
@@ -43,17 +45,23 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
-    "vitest": "^1.0.0",
-    "prettier": "^3.0.0",
+    "@eslint/js": "^8.0.0",
+    "@types/node": "^20.0.0",
     "eslint": "^8.0.0",
-    "@eslint/js": "^8.0.0"
+    "expect": "^30.3.0",
+    "fast-check": "^3.23.2",
+    "prettier": "^3.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.58.0"
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "format": "prettier --write \"src/**/*.js\" \"test/**/*.js\" \"*.js\"",
-    "lint": "eslint src test *.js",
-    "lint:fix": "eslint src test *.js --fix"
+    "test": "rm -rf dist && tsc && node --test dist/test/**/*.test.js",
+    "test:watch": "tsc && node --test --watch dist/test/**/*.test.js",
+    "format": "prettier --write \"src/**/*.{js,ts}\" \"test/**/*.{js,ts}\" \"*.{js,ts}\"",
+    "lint": "eslint src test *.{js,ts}",
+    "lint:fix": "eslint src test *.{js,ts} --fix",
+    "typecheck": "tsc --noEmit"
   },
   "publishConfig": {
     "access": "public",

@@ -7,7 +7,8 @@
  * Run: npm test
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'node:test';
+import { expect } from 'expect';
 import { VoidShield, generateCodename } from '../src/voidshield.js';
 import { EFF_WORDLIST } from '../src/eff_wordlist.js';
 
@@ -172,8 +173,12 @@ describe('VoidShield.validateCodename', () => {
 
   it('rejects empty / null input', () => {
     expect(VoidShield.validateCodename('').valid).toBe(false);
-    expect(VoidShield.validateCodename(null).valid).toBe(false);
-    expect(VoidShield.validateCodename(undefined).valid).toBe(false);
+    expect(VoidShield.validateCodename(null as unknown as string).valid).toBe(
+      false
+    );
+    expect(
+      VoidShield.validateCodename(undefined as unknown as string).valid
+    ).toBe(false);
   });
 });
 
@@ -587,6 +592,131 @@ describe('Security invariants', () => {
     const { ciphertextB64, ivB64 } = await VoidShield.encrypt('private', k1);
     await expect(
       VoidShield.decrypt(ciphertextB64, ivB64, k2)
+    ).rejects.toThrow();
+  });
+});
+
+// ── Media Chunks AAD testing ───────────────────────────────────────────────
+
+describe('VoidShield media chunk AAD validation', () => {
+  it('throws an error if a chunk originates from a different streamId', async () => {
+    const rh = await VoidShield.roomId(
+      'a@b.com',
+      'c@d.com',
+      'cross-stream-test'
+    );
+    const key = await VoidShield.deriveKey('cross-stream-test', rh);
+
+    const file1 = new File([new Uint8Array(500 * 1024).fill(7)], 'test1.bin', {
+      type: 'application/octet-stream',
+    });
+    const chunks1 = await VoidShield.encryptMedia(file1, key);
+
+    const file2 = new File([new Uint8Array(500 * 1024).fill(8)], 'test2.bin', {
+      type: 'application/octet-stream',
+    });
+    const chunks2 = await VoidShield.encryptMedia(file2, key);
+
+    chunks1[1] = chunks2[1]!;
+
+    let threw = false;
+    try {
+      for await (const _buf of VoidShield.decryptMediaStream(chunks1, key)) {
+        // Drain stream to trigger auth check
+      }
+    } catch (_e) {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+  });
+  it('throws an error if a chunk index is tampered with', async () => {
+    const rh = await VoidShield.roomId('a@b.com', 'c@d.com', 'media-aad-test');
+    const key = await VoidShield.deriveKey('media-aad-test', rh);
+    const file = new File([new Uint8Array(512).fill(7)], 'test.bin', {
+      type: 'application/octet-stream',
+    });
+    const chunks = await VoidShield.encryptMedia(file, key);
+
+    chunks[0]!.index = 1; // Tamper index
+
+    let threw = false;
+    try {
+      for await (const _buf of VoidShield.decryptMediaStream(chunks, key)) {
+        // Drain stream to trigger auth check
+      }
+    } catch (_e) {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+  });
+
+  it('throws an error if totalChunks is tampered with', async () => {
+    const rh = await VoidShield.roomId('a@b.com', 'c@d.com', 'media-aad-test');
+    const key = await VoidShield.deriveKey('media-aad-test', rh);
+    const file = new File([new Uint8Array(512).fill(7)], 'test.bin', {
+      type: 'application/octet-stream',
+    });
+    const chunks = await VoidShield.encryptMedia(file, key);
+
+    chunks[0]!.totalChunks = 999; // Tamper count
+
+    let threw = false;
+    try {
+      for await (const _buf of VoidShield.decryptMediaStream(chunks, key)) {
+        // Drain stream to trigger auth check
+      }
+    } catch (_e) {
+      threw = true;
+    }
+    expect(threw).toBe(true);
+  });
+});
+
+// ── Hybrid Kyber Encryption ───────────────────────────────────────────────
+
+describe('VoidShield hybrid Kyber encryption', () => {
+  it('encrypts and decrypts a hybrid payload correctly', async () => {
+    const { publicKey, secretKey } = await VoidShield.generateKyberKeyPair();
+    const plaintext = 'top secret quantum payload';
+
+    const hybridCt = await VoidShield.encryptHybrid(plaintext, publicKey);
+
+    expect(hybridCt).toHaveProperty('version');
+    expect(hybridCt).toHaveProperty('aesCiphertextB64');
+    expect(hybridCt).toHaveProperty('aesIvB64');
+    expect(hybridCt).toHaveProperty('kyberCiphertextB64');
+    expect(hybridCt).toHaveProperty('encapsulatedKeyB64');
+
+    const decrypted = await VoidShield.decryptHybrid(hybridCt, secretKey);
+    expect(decrypted).toBe(plaintext);
+  });
+
+  it('fails decryption with an invalid secret key', async () => {
+    const { publicKey } = await VoidShield.generateKyberKeyPair();
+    const { secretKey: wrongKey } = await VoidShield.generateKyberKeyPair();
+    const plaintext = 'top secret quantum payload';
+
+    const hybridCt = await VoidShield.encryptHybrid(plaintext, publicKey);
+
+    await expect(
+      VoidShield.decryptHybrid(hybridCt, wrongKey)
+    ).rejects.toThrow();
+  });
+
+  it('fails decryption if wrapped key is tampered with', async () => {
+    const { publicKey, secretKey } = await VoidShield.generateKyberKeyPair();
+    const hybridCt = await VoidShield.encryptHybrid('test', publicKey);
+
+    if (hybridCt.encapsulatedKeyB64) {
+      hybridCt.encapsulatedKeyB64 =
+        hybridCt.encapsulatedKeyB64.substring(
+          0,
+          hybridCt.encapsulatedKeyB64.length - 2
+        ) + 'XX';
+    }
+
+    await expect(
+      VoidShield.decryptHybrid(hybridCt, secretKey)
     ).rejects.toThrow();
   });
 });
