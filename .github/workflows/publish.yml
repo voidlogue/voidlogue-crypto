@@ -3,14 +3,14 @@ name: Publish to npm
 on:
   push:
     tags:
-      - 'v*' # Triggers when you push a tag like v1.0.2
+      - 'v*'
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # To create GitHub Releases
-      id-token: write   # To enable npm Provenance
+      contents: write
+      id-token: write   # ✅ Required for provenance
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -24,8 +24,12 @@ jobs:
 
       - name: Install & Test
         run: |
-          npm install
+          npm ci  # Better than npm install for CI
           npm test
+
+      # 🔥 CRITICAL FIX: Upgrade npm for OIDC support
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -35,8 +39,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to npm
-        run: |
-          npm config set //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}
-          npm publish --provenance --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
