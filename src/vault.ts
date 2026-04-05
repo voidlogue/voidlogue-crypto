@@ -175,8 +175,13 @@ export const Vault = {
 
     localStorage.setItem(`voidlogue_conv_${roomHash}`, JSON.stringify(blob));
 
-    const labelEntry = await encryptLabel(hint, key);
-    await this._updateIndex(roomHash, labelEntry);
+    // Only add labelled conversations to the index.
+    // Ghost (unlabelled) convos are stored in localStorage under their key
+    // but must NOT appear in the convlist so they stay hidden from the UI.
+    if (hint.trim()) {
+      const labelEntry = await encryptLabel(hint, key);
+      await this._updateIndex(roomHash, labelEntry);
+    }
     return true;
   },
 
@@ -257,12 +262,14 @@ export const Vault = {
     newPin: string
   ): Promise<boolean> {
     const entry = this._getEncryptedHint(roomHash);
+    // entry is always an object ({encrypted:'', iv:'', …}) for unlabelled convos,
+    // so we must check entry?.encrypted (non-empty string) — not just entry.
     return this.save(
       roomHash,
       email,
       codename,
       newPin,
-      entry ? '(restored)' : ''
+      entry?.encrypted ? '(restored)' : ''
     );
   },
 
